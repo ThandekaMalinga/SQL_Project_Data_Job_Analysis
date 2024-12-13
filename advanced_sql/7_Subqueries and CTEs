@@ -1,0 +1,192 @@
+-- SUBQUERY
+
+SELECT *
+FROM ( --subquery starts here (this is a comment)
+    SELECT *
+    FROM job_postings_fact
+    WHERE EXTRACT(MONTH FROM job_posted_date) = 1
+) AS january_jobs;
+-- subquery ends here (this is a comment)
+
+-- SUBQUERY EXAMPLE: Finding a list of jobs with no degree metioned/required
+
+SELECT 
+    company_id,
+    name AS company_name
+FROM
+    company_dim
+WHERE company_id IN (
+    SELECT
+        company_id
+    FROM
+        job_postings_fact
+    WHERE
+        job_no_degree_mention = true
+    ORDER BY company_id
+)
+
+-- USING A JOIN FOR THE SAME EXAMPLE AS THE ABOVE
+
+SELECT DISTINCT
+    cd.company_id,
+    cd.name AS company_name
+FROM
+    company_dim cd
+JOIN
+    job_postings_fact jp
+ON
+    cd.company_id = jp.company_id
+WHERE
+    jp.job_no_degree_mention = true
+ORDER BY company_id;
+
+
+-- COMMON TABLE EXPRESSIONS (CTEs)
+WITH february_jobs AS (-- CTE definition starts here - this is a comment
+    SELECT *
+    FROM job_postings_fact
+    WHERE EXTRACT(MONTH FROM job_posted_date) = 2
+) -- CTE definition ends here - this is a comment
+
+SELECT * 
+FROM february_jobs
+
+-- CTE EXAMPLE
+/*
+Find the companies that have most job openings.
+- Get the total number of job postings per company id (job postings table)
+- Return the total number of jobs with the company name (company dim table)
+*/
+
+WITH company_job_count AS (
+    SELECT
+        company_id,
+        COUNT(*) AS total_jobs
+    FROM
+        job_postings_fact
+    GROUP BY
+        company_id
+)
+
+SELECT 
+    company_dim.name AS company_name,
+    company_job_count.total_jobs
+FROM 
+    company_dim
+LEFT JOIN company_job_count ON company_job_count.company_id = company_dim.company_id
+ORDER BY 
+    total_jobs DESC;
+
+/*
+Key Points:
+CTE: Simplifies the query by precomputing job counts.
+LEFT JOIN: Ensures no companies are excluded, even if they have no job postings.
+ORDER BY total_jobs DESC: Highlights companies with the most job postings first.
+*/
+
+
+-- PRACTICE PROBLEMS
+
+/*
+
+Identify the top 5 skills that are most frequently mentioned in job postings. 
+Use a subquery to find the skill IDs with the highest counts in the 
+skills_job_dim table and then join this result with the skills_dim table to 
+get the skills names
+*/
+
+SELECT *
+FROM skills_job_dim
+LIMIT 5;
+
+SELECT *
+FROM skills_dim
+LIMIT 5;
+
+-- Step 1: Use a subquery to count the frequency of each skill in the skills_job_dim table
+-- Step 2: Order the counts in descending order and limit the result to the top 5 skills
+-- Step 3: Join the top 5 skill IDs with the skills_dim table to get the skill names
+
+SELECT
+    sd.skills AS skill_name,
+    skill_counts.skill_count
+FROM
+    (SELECT
+         skill_id,
+         COUNT(skill_id) AS skill_count
+     FROM
+         skills_job_dim
+     GROUP BY
+         skill_id
+     ORDER BY
+         skill_count DESC
+     LIMIT 5) AS skill_counts
+JOIN
+    skills_dim sd
+ON
+    skill_counts.skill_id = sd.skill_id;
+
+
+-- PRACTICE #2
+
+/*
+Determine the size category (‘Small, Medium or large) for each company by first identifying
+the number of job postings they have. Use a subquery to calculate the total job postings 
+per company. A company is considered Small if it has less than 10 job postings, Medium if 
+the number of job postings is between 10 and 50, and Large if it has more than 50 job postings. 
+Implement a subquery to aggregate job counts per company before classifying them based on size. 
+
+*/
+
+-- Step 1: Calculate the total number of job postings per company using a subquery
+-- Step 2: Classify companies as 'Small', 'Medium', or 'Large' based on the count
+-- Step 3: Use CASE statements for categorization
+
+SELECT
+    c.name AS company_name,
+    job_counts.total_jobs,
+    CASE
+        WHEN job_counts.total_jobs < 10 THEN 'Small'
+        WHEN job_counts.total_jobs BETWEEN 10 AND 50 THEN 'Medium'
+        ELSE 'Large'
+    END AS size_category
+FROM
+    company_dim c
+JOIN
+    (SELECT
+         company_id,
+         COUNT(*) AS total_jobs
+     FROM
+         job_postings_fact
+     GROUP BY
+         company_id) AS job_counts
+ON
+    c.company_id = job_counts.company_id;
+
+
+-- EXERCISE
+
+/*
+Find the count of the count of the number of remote job postings per skill
+- Display the top 5 skills by their demand in remote jobs
+- Include skill ID, name, and count of postings requiring the skill
+*/
+
+WITH remote_job_skills AS (
+    SELECT
+        skill_id,
+        COUNT(*) AS skill_count
+    FROM
+        skills_job_dim AS skills_to_job
+    INNER JOIN job_postings_fact AS job_postings ON job_postings.job_id = skills_to_job.job_id
+    WHERE 
+        job_postings.job_work_from_home = True 
+    GROUP BY skill_id
+)
+
+SELECT 
+    skills.skill_id,
+    skills AS skill_name,
+    skill_count
+FROM remote_job_skills
+INNER JOIN skills_dim AS skills ON skills.skill_id = remote_job_skills.skill_id

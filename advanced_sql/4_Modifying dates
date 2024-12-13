@@ -1,0 +1,80 @@
+-- CONVERTING the date column into a DATE type
+SELECT 
+    job_title_short AS title,
+    job_location AS location,
+    job_posted_date::DATE AS date -- this will remove the time associated with the date because this column contains a timestamp, which is the date and the time
+FROM job_postings_fact
+LIMIT 10;
+
+-- CONVERTING the date column into a TIME ZONE
+-- Because the dat we are using actually doesn't include the timezone, we will first include/assign the time zone and then convert it to a different time zone
+SELECT 
+    job_title_short AS title,
+    job_location AS location,
+    job_posted_date AT TIME ZONE 'UTC' AT TIME ZONE 'EST'  -- assigning timezone and then changing it
+FROM job_postings_fact
+LIMIT 10;
+
+-- EXTRACTING the month and the year from the job postings date
+SELECT 
+    job_title_short AS title,
+    job_location AS location,
+    job_posted_date AT TIME ZONE 'UTC' AT TIME ZONE 'EST' AS date_time,  -- assigning timezone and then changing it
+    EXTRACT(MONTH FROM job_posted_date) AS date_month,
+    EXTRACT(YEAR FROM job_posted_date) AS date_year
+FROM job_postings_fact
+LIMIT 10;
+
+-- You can select a random value and view it without using the FROM statement
+SELECT '2023-02-19';
+
+-- Casting a DATE type to the following
+SELECT '2023-02-19'::DATE,
+'123'::INTEGER,
+'true'::BOOLEAN,
+'3.14'::REAL;
+
+-- PRACTICE PROBLEMS
+-- PROBLEM #1
+SELECT
+    AVG(salary_year_avg) as year_avg,
+    AVG(salary_hour_avg) as hour_avg,
+    job_schedule_type
+FROM
+    job_postings_fact
+WHERE job_posted_date > '2023-06-01'
+GROUP BY job_schedule_type;
+
+-- Option number two
+SELECT
+    AVG(salary_year_avg) AS year_avg,
+    AVG(salary_hour_avg) AS hour_avg,
+    job_schedule_type,
+    job_posted_date
+FROM
+    job_postings_fact
+WHERE job_posted_date > '2023-06-01'
+GROUP BY job_schedule_type, job_posted_date;
+
+-- PROBLEM #2
+SELECT
+    EXTRACT(MONTH FROM job_posted_date AT TIME ZONE 'UTC' AT TIME ZONE 'America/New_York') AS job_month,
+    COUNT(job_id) AS num_of_jobs
+FROM job_postings_fact
+WHERE EXTRACT(YEAR FROM job_posted_date AT TIME ZONE 'UTC' AT TIME ZONE 'America/New_York') = 2023
+GROUP BY job_month
+ORDER BY job_month;
+
+-- PROBLEM 3
+SELECT 
+    company_dim.name AS company_name,
+    job_postings_fact.job_posted_date AS date
+FROM job_postings_fact
+LEFT JOIN company_dim
+ON job_postings_fact.company_id = company_dim.company_id
+WHERE 
+    job_postings_fact.job_health_insurance = TRUE
+    AND EXTRACT(YEAR FROM job_posted_date AT TIME ZONE 'UTC' AT TIME ZONE 'America/New_York') = 2023
+    AND EXTRACT(QUARTER FROM job_posted_date AT TIME ZONE 'UTC' AT TIME ZONE 'America/New_York') = 2
+LIMIT 10;
+
